@@ -19,36 +19,25 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.esell.Item
+import coil.compose.AsyncImage
 import kotlin.math.abs
 
-
-val demoItems = listOf(
-    Item("Гитара акустическая", "8 500 ₽", "Отличное состояние, играл пару лет.", "Другое"),
-    Item("Велосипед горный", "12 000 ₽", "Рама 18, всё работает, недавно смазал цепь.", "Транспорт"),
-    Item("Настольная лампа", "700 ₽", "Тёплый свет, есть регулировка яркости.", "Дом"),
-    Item("Рюкзак туристический", "2 500 ₽", "60 литров, б/у один сезон, крепкий.", "Одежда"),
-    Item("Клавиатура механическая", "3 200 ₽", "Red switches, в хорошем состоянии.", "Электроника"),
-    Item("Учебник по Kotlin", "900 ₽", "Идеальное состояние, для начинающих.", "Книги"),
-)
+val allCategories = listOf("Все", "Электроника", "Книги", "Транспорт", "Дом", "Одежда", "Другое")
 
 private val placeholderColors = listOf(
-    Color(0xFF7986CB),
-    Color(0xFF4FC3F7),
-    Color(0xFF81C784),
-    Color(0xFFFFB74D),
-    Color(0xFFE57373),
-    Color(0xFFBA68C8)
+    Color(0xFF7986CB), Color(0xFF4FC3F7), Color(0xFF81C784),
+    Color(0xFFFFB74D), Color(0xFFE57373), Color(0xFFBA68C8)
 )
 
 @Composable
 fun FeedScreen(
-    allItems: List<Item> = demoItems,
+    uiState: FeedUiState,
+    onRetry: () -> Unit,
     onItemClick: (Item) -> Unit,
     onAddClick: () -> Unit,
     onProfileClick: () -> Unit
@@ -56,18 +45,17 @@ fun FeedScreen(
     var query by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("Все") }
 
-    val filtered = remember(query, selectedCategory, allItems) {
-        allItems.filter { item ->
-            val matchesCategory =
-                selectedCategory == "Все" || item.category == selectedCategory
-
+    val itemsToShow = if (uiState is FeedUiState.Success) {
+        uiState.items.filter { item ->
+            val matchesCategory = selectedCategory == "Все" || item.category == selectedCategory
             val q = query.trim().lowercase()
             val matchesQuery = q.isEmpty() ||
                     item.title.lowercase().contains(q) ||
                     item.description.lowercase().contains(q)
-
             matchesCategory && matchesQuery
         }
+    } else {
+        emptyList()
     }
 
     Scaffold(
@@ -84,18 +72,10 @@ fun FeedScreen(
                         .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "eSell",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Text("eSell", fontSize = 24.sp, fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
                     IconButton(onClick = onProfileClick) {
-                        Icon(
-                            imageVector = Icons.Filled.Person,
-                            contentDescription = "Профиль"
-                        )
+                        Icon(Icons.Filled.Person, contentDescription = "Профиль")
                     }
                 }
 
@@ -103,13 +83,9 @@ fun FeedScreen(
                     value = query,
                     onValueChange = { query = it },
                     placeholder = { Text("Поиск по названию или описанию") },
-                    leadingIcon = {
-                        Icon(Icons.Filled.Search, contentDescription = null)
-                    },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -126,7 +102,6 @@ fun FeedScreen(
                         )
                     }
                 }
-
                 Spacer(modifier = Modifier.height(8.dp))
             }
         },
@@ -136,35 +111,37 @@ fun FeedScreen(
             }
         }
     ) { innerPadding ->
-        if (filtered.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Ничего не найдено",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(
-                    start = 12.dp,
-                    end = 12.dp,
-                    top = 12.dp,
-                    bottom = 88.dp
-                ),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(filtered, key = { it.title + it.price }) { item ->
-                    ItemCard(item = item, onClick = { onItemClick(item) })
+        Box(
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            contentAlignment = Alignment.Center
+        ) {
+            when (uiState) {
+                is FeedUiState.Loading -> CircularProgressIndicator()
+
+                is FeedUiState.Error -> {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = uiState.message, color = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = onRetry) { Text("Повторить") }
+                    }
+                }
+
+                is FeedUiState.Success -> {
+                    if (itemsToShow.isEmpty()) {
+                        Text("Ничего не найдено", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 88.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(itemsToShow, key = { it.id }) { item ->
+                                ItemCard(item = item, onClick = { onItemClick(item) })
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -178,55 +155,38 @@ private fun ItemCard(item: Item, onClick: () -> Unit) {
     }
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .background(bgColor),
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f).background(bgColor),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Image,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.size(48.dp)
-                )
+                if (item.imageUrl != null) {
+                    AsyncImage(
+                        model = item.imageUrl,
+                        contentDescription = item.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(Icons.Filled.Image, contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(48.dp))
+                }
             }
 
             Column(modifier = Modifier.padding(10.dp)) {
-                Text(
-                    text = item.category,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Text(item.category, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = item.title,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Text(item.title, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = item.price,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Text(item.price, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary)
             }
         }
     }
