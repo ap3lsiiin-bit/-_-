@@ -13,11 +13,20 @@ data class Item(
     val dealType: String = "sale"
 )
 
+private const val BASE_URL = "http://95.31.156.238:8000"
+
 fun ItemResponse.toItem(): Item {
     val formattedPrice = if (this.price > 0) {
         String.format("%,d ₽", this.price).replace(',', ' ')
     } else {
         "Бесплатно"
+    }
+
+    val fullImageUrl = when {
+        photo_url.isNullOrBlank() -> null
+        photo_url.startsWith("http") -> photo_url
+        photo_url.startsWith("/") -> "$BASE_URL$photo_url"
+        else -> null
     }
 
     return Item(
@@ -27,7 +36,7 @@ fun ItemResponse.toItem(): Item {
         description = this.description,
         category = this.category?.name ?: "Другое",
         owner = this.author?.username ?: "Неизвестный автор",
-        imageUrl = this.photo_url,
+        imageUrl = fullImageUrl,
         dealType = this.deal_type
     )
 }
