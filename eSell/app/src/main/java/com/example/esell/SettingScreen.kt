@@ -16,10 +16,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 
 private const val BIO_MAX = 500
 
@@ -42,6 +40,18 @@ fun SettingsScreen(
     var bioError by remember { mutableStateOf<String?>(null) }
 
     var showClearDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(viewModel.errorMessage) {
+        viewModel.errorMessage?.let { error ->
+            Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+            when {
+                error.contains("Имя") -> nameError = error
+                error.contains("Email") -> emailError = error
+                error.contains("Описание") -> bioError = error
+            }
+            viewModel.clearError()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -92,12 +102,10 @@ fun SettingsScreen(
 
         OutlinedTextField(
             value = draftEmail,
-            onValueChange = {
-                draftEmail = it
-                if (emailError != null) emailError = null
-            },
+            onValueChange = { },
             label = { Text("Email") },
             singleLine = true,
+            readOnly = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             isError = emailError != null,
             supportingText = { emailError?.let { Text(it) } },
@@ -157,29 +165,29 @@ fun SettingsScreen(
 
         Button(
             onClick = {
-                val error = viewModel.save(
+                viewModel.saveProfileToServer(
                     name = draftName,
-                    email = draftEmail,
                     bio = draftBio,
                     notifications = draftNotifications
-                )
-                if (error != null) {
-                    Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
-                    when {
-                        error.contains("Имя") -> nameError = error
-                        error.contains("Email") -> emailError = error
-                        error.contains("Описание") -> bioError = error
-                    }
-                    return@Button
+                ) {
+                    Toast.makeText(context, "Профиль успешно обновлён", Toast.LENGTH_SHORT).show()
+                    onSaved()
                 }
-                Toast.makeText(context, "Профиль сохранён", Toast.LENGTH_SHORT).show()
-                onSaved()
             },
+            enabled = !viewModel.isLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp)
         ) {
-            Text("Сохранить", fontSize = 16.sp)
+            if (viewModel.isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text("Сохранить", fontSize = 16.sp)
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))

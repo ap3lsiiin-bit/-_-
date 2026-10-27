@@ -27,7 +27,26 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlin.math.abs
 
-val allCategories = listOf("Все", "Электроника", "Книги", "Транспорт", "Дом", "Одежда", "Другое")
+val allCategories = listOf(
+    "Все",
+    "Прочее",
+    "Книги",
+    "Красота и здоровье",
+    "Строительство и ремонт",
+    "Запчасти",
+    "Работа",
+    "Услуги",
+    "Животные",
+    "Спорт",
+    "Хобби и отдых",
+    "Детские товары",
+    "Бытовая техника",
+    "Дом и сад",
+    "Недвижимость",
+    "Автомобили",
+    "Одежда",
+    "Электроника"
+)
 
 private val placeholderColors = listOf(
     Color(0xFF7986CB), Color(0xFF4FC3F7), Color(0xFF81C784),

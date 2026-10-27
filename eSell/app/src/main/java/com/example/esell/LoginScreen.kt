@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: (name: String, email: String) -> Unit,
+    onLoginSuccess: (name: String, email: String, bio: String) -> Unit,
     onGoToRegister: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -105,7 +105,6 @@ fun LoginScreen(
                 isLoading = true
                 scope.launch {
                     try {
-
                         val tokenResponse = RetrofitClient.apiService.login(
                             LoginRequest(email = email.trim(), password = password)
                         )
@@ -115,7 +114,7 @@ fun LoginScreen(
                         val user = RetrofitClient.apiService.getMe()
                         isLoading = false
 
-                        onLoginSuccess(user.username, email.trim())
+                        onLoginSuccess(user.username, email.trim(), user.about_me ?: "")
                     } catch (e: Exception) {
                         isLoading = false
                         serverError = "Ошибка входа: ${e.message}"

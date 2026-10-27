@@ -67,7 +67,7 @@ fun AppRoot() {
                     user.email ?: prefs.getUserEmail(),
                     user.about_me ?: ""
                 )
-                profileViewModel.save(
+                profileViewModel.updateLocalState(
                     name = user.username,
                     email = user.email ?: "",
                     bio = user.about_me ?: "",
@@ -104,13 +104,13 @@ fun AppRoot() {
     when (screen) {
         Screen.LOGIN -> {
             LoginScreen(
-                onLoginSuccess = { name, email ->
-                    prefs.saveProfile(name, email, prefs.getUserBio())
+                onLoginSuccess = { name, email, bio ->
+                    prefs.saveProfile(name, email, bio)
                     prefs.setLoggedIn(true)
-                    profileViewModel.save(
+                    profileViewModel.updateLocalState(
                         name = name,
                         email = email,
-                        bio = prefs.getUserBio(),
+                        bio = bio,
                         notifications = profileViewModel.notificationsEnabled
                     )
                     loggedIn = true
@@ -124,13 +124,13 @@ fun AppRoot() {
 
         Screen.REGISTER -> {
             RegisterScreen(
-                onRegisterSuccess = { name, email ->
-                    prefs.saveProfile(name, email, "")
+                onRegisterSuccess = { name, email, bio ->
+                    prefs.saveProfile(name, email, bio)
                     prefs.setLoggedIn(true)
-                    profileViewModel.save(
+                    profileViewModel.updateLocalState(
                         name = name,
                         email = email,
-                        bio = "",
+                        bio = bio,
                         notifications = profileViewModel.notificationsEnabled
                     )
                     loggedIn = true

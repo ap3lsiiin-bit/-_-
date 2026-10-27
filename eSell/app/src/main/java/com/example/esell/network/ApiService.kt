@@ -3,6 +3,7 @@ package com.example.esell.network
 import com.example.esell.dto.*
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Query
 
@@ -22,4 +23,7 @@ interface ApiService {
 
     @GET("user/me")
     suspend fun getMe(): UserResponse
+
+    @PATCH("user/me")
+    suspend fun updateMe(@Body request: UpdateUserRequest): UserResponse
 }

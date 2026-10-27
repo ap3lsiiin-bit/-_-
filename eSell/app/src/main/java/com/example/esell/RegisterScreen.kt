@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun RegisterScreen(
-    onRegisterSuccess: (name: String, email: String) -> Unit,
+    onRegisterSuccess: (name: String, email: String, bio: String) -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -136,7 +136,7 @@ fun RegisterScreen(
                         tokenStorage.saveTokens(tokenResponse.access_token, tokenResponse.refresh_token)
 
                         isLoading = false
-                        onRegisterSuccess(name.trim(), email.trim())
+                        onRegisterSuccess(name.trim(), email.trim(), "")
                     } catch (e: Exception) {
                         isLoading = false
                         serverError = "Ошибка регистрации: ${e.message}"
