@@ -38,6 +38,12 @@ class ProfilePreferences(context: Context) {
     }
 
     fun clearProfile() {
-        prefs.edit().clear().apply()
+        prefs.edit()
+            .remove(KEY_USER_NAME)
+            .remove(KEY_USER_EMAIL)
+            .remove(KEY_USER_BIO)
+            .remove(KEY_NOTIFICATIONS)
+            .putBoolean(KEY_LOGGED_IN, false)
+            .apply()
     }
 }

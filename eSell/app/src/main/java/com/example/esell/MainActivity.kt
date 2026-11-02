@@ -6,7 +6,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,7 +14,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.esell.network.RetrofitClient
 import com.example.esell.ui.theme.ESellTheme
-import kotlinx.coroutines.launch
 
 const val PREFS_NAME = "esell_prefs"
 const val KEY_ONBOARDING_DONE = "onboarding_done"
@@ -39,7 +37,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-enum class Screen { FEED, LOGIN, REGISTER, PROFILE, SETTINGS, CREATE_LISTING }
+enum class Screen { FEED, LOGIN, REGISTER, PROFILE, SETTINGS, CREATE_LISTING, ITEM_DETAIL, MY_LISTINGS, CHAT
+}
 
 @Composable
 fun AppRoot() {
@@ -49,6 +48,7 @@ fun AppRoot() {
 
     val profileViewModel: ProfileViewModel = viewModel()
     val feedViewModel: FeedViewModel = viewModel()
+    val chatViewModel: ChatViewModel = viewModel()
 
     var onboardingDone by remember { mutableStateOf(prefs.isOnboardingDone()) }
 
@@ -56,6 +56,8 @@ fun AppRoot() {
     var loggedIn by remember { mutableStateOf(false) }
 
     var screen by remember { mutableStateOf(Screen.FEED) }
+
+    var selectedItem by remember { mutableStateOf<Item?>(null) }
 
     LaunchedEffect(Unit) {
         if (tokenStorage.hasAccessToken()) {
@@ -147,7 +149,7 @@ fun AppRoot() {
                 userEmail = profileViewModel.email.ifBlank { "email@example.com" },
                 userBio = profileViewModel.aboutMe,
                 onBack = { screen = Screen.FEED },
-                onMyListings = {  },
+                onMyListings = { screen = Screen.MY_LISTINGS },
                 onSettings = { screen = Screen.SETTINGS },
                 onLogout = {
                     tokenStorage.clearTokens()
@@ -159,16 +161,29 @@ fun AppRoot() {
             )
         }
 
+        Screen.MY_LISTINGS -> {
+            val allItems = (feedViewModel.uiState as? FeedUiState.Success)?.items ?: emptyList()
+            val myItems = allItems.filter { it.owner == profileViewModel.username }
+
+            MyListingsScreen(
+                myItems = myItems,
+                onBack = { screen = Screen.PROFILE },
+                onItemClick = { item ->
+                    selectedItem = item
+                    screen = Screen.ITEM_DETAIL
+                }
+            )
+        }
+
         Screen.SETTINGS -> {
             SettingsScreen(
                 viewModel = profileViewModel,
                 onSaved = { screen = Screen.PROFILE },
                 onClearProfile = {
                     tokenStorage.clearTokens()
-                    prefs.setOnboardingDone(false)
                     prefs.setLoggedIn(false)
+                    profileViewModel.clearProfile()
                     loggedIn = false
-                    onboardingDone = false
                     screen = Screen.FEED
                 },
                 onBack = { screen = Screen.PROFILE }
@@ -178,15 +193,62 @@ fun AppRoot() {
         Screen.CREATE_LISTING -> {
             CreateAdsScreen(
                 onBack = { screen = Screen.FEED },
-                onCreate = { title, price, type, description, imageUri ->
-                    Toast.makeText(
-                        context,
-                        "Создано: $title ($type)",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                onCreateSuccess = {
+                    feedViewModel.loadItems()
                     screen = Screen.FEED
                 }
             )
+        }
+
+        Screen.ITEM_DETAIL -> {
+            val item = selectedItem
+            if (item != null) {
+                val isOwner = loggedIn && item.owner == profileViewModel.username
+
+                ItemDetailScreen(
+                    item = item,
+                    isOwner = isOwner,
+                    isDeleting = feedViewModel.isDeleting,
+                    onBack = { screen = Screen.FEED },
+                    onDeleteConfirm = {
+                        feedViewModel.deleteItem(item.id) { success ->
+                            if (success) {
+                                Toast.makeText(context, "Объявление удалено", Toast.LENGTH_SHORT).show()
+                                screen = Screen.FEED
+                            } else {
+                                Toast.makeText(context, "Ошибка при удалении", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    onChatClick = {
+                        chatViewModel.loadMessages(item.id)
+                        screen = Screen.CHAT
+                    }
+                )
+            } else {
+                screen = Screen.FEED
+            }
+        }
+
+        Screen.CHAT -> {
+            val item = selectedItem
+            if (item != null) {
+                ChatScreen(
+                    itemTitle = item.title,
+                    currentUsername = profileViewModel.username,
+                    messages = chatViewModel.messages,
+                    isLoading = chatViewModel.isLoading,
+                    isSending = chatViewModel.isSending,
+                    errorMessage = chatViewModel.errorMessage,
+                    onSendMessage = { text ->
+                        chatViewModel.sendMessage(item.id, text) {
+                        }
+                    },
+                    onBack = { screen = Screen.ITEM_DETAIL }
+                )
+            } else {
+                screen = Screen.FEED
+            }
         }
 
         Screen.FEED -> {
@@ -194,7 +256,8 @@ fun AppRoot() {
                 uiState = feedViewModel.uiState,
                 onRetry = { feedViewModel.loadItems() },
                 onItemClick = { item ->
-                    Toast.makeText(context, "Открыть: ${item.title}", Toast.LENGTH_SHORT).show()
+                    selectedItem = item
+                    screen = Screen.ITEM_DETAIL
                 },
                 onAddClick = {
                     if (!loggedIn) {
