@@ -26,6 +26,16 @@ class FeedViewModel : ViewModel() {
         loadItems()
     }
 
+    fun silentRefresh() {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.apiService.getItems(page = 1, pageSize = 20)
+                val mappedItems = response.items.map { it.toItem() }
+                uiState = FeedUiState.Success(mappedItems)
+            } catch (e: Exception) { }
+        }
+    }
+
     fun loadItems() {
         uiState = FeedUiState.Loading
         viewModelScope.launch {
@@ -41,15 +51,26 @@ class FeedViewModel : ViewModel() {
         }
     }
 
-    fun deleteItem(itemId: Int, onResult: (Boolean) -> Unit) {
+    fun deleteItem(itemId: Int, onResult: (String?) -> Unit) {
         viewModelScope.launch {
             isDeleting = true
             try {
-                RetrofitClient.apiService.deleteItem(itemId)
-                loadItems()
-                onResult(true)
+                val response = RetrofitClient.apiService.deleteItem(itemId)
+
+                if (response.isSuccessful) {
+                    loadItems()
+                    onResult(null)
+                } else {
+                    val errorMsg = when (response.code()) {
+                        401 -> "Сначала войдите в аккаунт"
+                        403 -> "У вас нет прав на удаление этого объявления"
+                        404 -> "Объявление уже удалено или не найдено"
+                        else -> "Не удалось удалить объявление (код ${response.code()})"
+                    }
+                    onResult(errorMsg)
+                }
             } catch (e: Exception) {
-                onResult(false)
+                onResult("Ошибка сети. Объявление не удалено")
             } finally {
                 isDeleting = false
             }

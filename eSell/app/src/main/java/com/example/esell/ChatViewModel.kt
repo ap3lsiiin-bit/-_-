@@ -9,6 +9,7 @@ import com.example.esell.dto.CreateMessageRequest
 import com.example.esell.dto.MessageResponse
 import com.example.esell.network.RetrofitClient
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 
 class ChatViewModel : ViewModel() {
     var messages by mutableStateOf<List<MessageResponse>>(emptyList())
@@ -20,38 +21,61 @@ class ChatViewModel : ViewModel() {
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
-    fun loadMessages(itemId: Int) {
-        isLoading = true
-        errorMessage = null
+    fun loadMessages(itemId: Int, showLoading: Boolean = true) {
+        if (showLoading) isLoading = true
         viewModelScope.launch {
             try {
                 val response = RetrofitClient.apiService.getMessages(itemId)
                 messages = response.items
+                errorMessage = null
             } catch (e: Exception) {
-                errorMessage = "Ошибка загрузки: ${e.message}"
+                if (messages.isEmpty()) {
+                    errorMessage = "Ошибка загрузки: ${e.message}"
+                }
             } finally {
-                isLoading = false
+                if (showLoading) isLoading = false
             }
         }
     }
 
     fun sendMessage(itemId: Int, text: String, onSuccess: () -> Unit) {
-        if (text.isBlank()) return
+        val trimmedText = text.trim()
+
+        if (trimmedText.isEmpty()) {
+            errorMessage = "Введите сообщение"
+            return
+        }
+
+        if (trimmedText.length > 500) {
+            errorMessage = "Не более 500 символов"
+            return
+        }
 
         isSending = true
+        errorMessage = null
         viewModelScope.launch {
             try {
                 val newMessage = RetrofitClient.apiService.sendMessage(
                     itemId,
-                    CreateMessageRequest(text.trim())
+                    CreateMessageRequest(trimmedText)
                 )
                 messages = messages + newMessage
                 onSuccess()
+            } catch (e: HttpException) {
+                if (e.code() == 401) {
+                    errorMessage = "Сначала войдите в аккаунт"
+                } else {
+                    errorMessage = "Ошибка сервера: ${e.code()}"
+                }
             } catch (e: Exception) {
-                errorMessage = "Ошибка отправки: ${e.message}"
+                errorMessage = "Ошибка сети: ${e.message}"
             } finally {
                 isSending = false
             }
         }
+    }
+
+    fun clearError() {
+        errorMessage = null
     }
 }

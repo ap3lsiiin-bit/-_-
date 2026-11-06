@@ -17,9 +17,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.esell.dto.MessageResponse
+import kotlinx.coroutines.delay
 
 @Composable
 fun ChatScreen(
+    itemId: Int,
     itemTitle: String,
     currentUsername: String,
     messages: List<MessageResponse>,
@@ -27,10 +29,18 @@ fun ChatScreen(
     isSending: Boolean,
     errorMessage: String?,
     onSendMessage: (String) -> Unit,
+    onRefreshMessages: () -> Unit,
     onBack: () -> Unit
 ) {
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+
+    LaunchedEffect(itemId) {
+        while (true) {
+            delay(5000)
+            onRefreshMessages()
+        }
+    }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -67,13 +77,15 @@ fun ChatScreen(
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            if (isLoading) {
+            if (isLoading && messages.isEmpty()) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (errorMessage != null) {
+            } else if (errorMessage != null && messages.isEmpty()) {
                 Text(
                     text = errorMessage,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.align(Alignment.Center)
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(16.dp)
                 )
             } else if (messages.isEmpty()) {
                 Text(
@@ -88,12 +100,21 @@ fun ChatScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(messages) { message ->
+                    items(messages, key = { it.id }) { message ->
                         val isMine = message.user.username == currentUsername
                         MessageBubble(message = message, isMine = isMine)
                     }
                 }
             }
+        }
+
+        if (errorMessage != null && messages.isNotEmpty()) {
+            Text(
+                text = errorMessage,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
         }
 
         Row(
@@ -104,10 +125,20 @@ fun ChatScreen(
         ) {
             OutlinedTextField(
                 value = inputText,
-                onValueChange = { inputText = it },
+                onValueChange = {
+                    if (it.length <= 500) {
+                        inputText = it
+                    }
+                },
                 placeholder = { Text("Сообщение...") },
                 modifier = Modifier.weight(1f),
-                maxLines = 4
+                maxLines = 4,
+                isError = errorMessage != null,
+                supportingText = {
+                    if (inputText.length > 400) {
+                        Text("${inputText.length} / 500")
+                    }
+                }
             )
             Spacer(modifier = Modifier.width(8.dp))
             IconButton(
@@ -119,14 +150,27 @@ fun ChatScreen(
                 },
                 enabled = !isSending && inputText.isNotBlank(),
                 modifier = Modifier
-                    .padding(bottom = 4.dp)
-                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50))
+                    .padding(bottom = 8.dp)
+                    .background(
+                        if (inputText.isNotBlank() && !isSending) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                        RoundedCornerShape(50)
+                    )
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Отправить",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
+                if (isSending) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Отправить",
+                        tint = if (inputText.isNotBlank()) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
@@ -136,7 +180,6 @@ fun ChatScreen(
 fun MessageBubble(message: MessageResponse, isMine: Boolean) {
     val bubbleColor = if (isMine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
     val textColor = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-
     val alignment = if (isMine) Alignment.CenterEnd else Alignment.CenterStart
     val shape = if (isMine) {
         RoundedCornerShape(16.dp, 16.dp, 0.dp, 16.dp)
@@ -148,9 +191,7 @@ fun MessageBubble(message: MessageResponse, isMine: Boolean) {
         modifier = Modifier.fillMaxWidth(),
         contentAlignment = alignment
     ) {
-        Column(
-            horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
-        ) {
+        Column(horizontalAlignment = if (isMine) Alignment.End else Alignment.Start) {
             if (!isMine) {
                 Text(
                     text = message.user.username,

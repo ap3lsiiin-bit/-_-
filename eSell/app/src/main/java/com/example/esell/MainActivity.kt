@@ -37,7 +37,16 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-enum class Screen { FEED, LOGIN, REGISTER, PROFILE, SETTINGS, CREATE_LISTING, ITEM_DETAIL, MY_LISTINGS, CHAT
+enum class Screen {
+    FEED,
+    LOGIN,
+    REGISTER,
+    PROFILE,
+    SETTINGS,
+    CREATE_LISTING,
+    ITEM_DETAIL,
+    MY_LISTINGS,
+    CHAT
 }
 
 @Composable
@@ -51,19 +60,16 @@ fun AppRoot() {
     val chatViewModel: ChatViewModel = viewModel()
 
     var onboardingDone by remember { mutableStateOf(prefs.isOnboardingDone()) }
-
     var isSessionChecking by remember { mutableStateOf(true) }
     var loggedIn by remember { mutableStateOf(false) }
 
     var screen by remember { mutableStateOf(Screen.FEED) }
-
     var selectedItem by remember { mutableStateOf<Item?>(null) }
 
     LaunchedEffect(Unit) {
         if (tokenStorage.hasAccessToken()) {
             try {
                 val user = RetrofitClient.apiService.getMe()
-
                 prefs.saveProfile(
                     user.username,
                     user.email ?: prefs.getUserEmail(),
@@ -211,12 +217,12 @@ fun AppRoot() {
                     isDeleting = feedViewModel.isDeleting,
                     onBack = { screen = Screen.FEED },
                     onDeleteConfirm = {
-                        feedViewModel.deleteItem(item.id) { success ->
-                            if (success) {
+                        feedViewModel.deleteItem(item.id) { errorMessage ->
+                            if (errorMessage == null) {
                                 Toast.makeText(context, "Объявление удалено", Toast.LENGTH_SHORT).show()
                                 screen = Screen.FEED
                             } else {
-                                Toast.makeText(context, "Ошибка при удалении", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
                             }
                         }
                     },
@@ -234,6 +240,7 @@ fun AppRoot() {
             val item = selectedItem
             if (item != null) {
                 ChatScreen(
+                    itemId = item.id,
                     itemTitle = item.title,
                     currentUsername = profileViewModel.username,
                     messages = chatViewModel.messages,
@@ -241,8 +248,10 @@ fun AppRoot() {
                     isSending = chatViewModel.isSending,
                     errorMessage = chatViewModel.errorMessage,
                     onSendMessage = { text ->
-                        chatViewModel.sendMessage(item.id, text) {
-                        }
+                        chatViewModel.sendMessage(item.id, text) { }
+                    },
+                    onRefreshMessages = {
+                        chatViewModel.loadMessages(item.id, showLoading = false)
                     },
                     onBack = { screen = Screen.ITEM_DETAIL }
                 )
@@ -255,6 +264,7 @@ fun AppRoot() {
             FeedScreen(
                 uiState = feedViewModel.uiState,
                 onRetry = { feedViewModel.loadItems() },
+                onSilentRefresh = { feedViewModel.silentRefresh() },
                 onItemClick = { item ->
                     selectedItem = item
                     screen = Screen.ITEM_DETAIL

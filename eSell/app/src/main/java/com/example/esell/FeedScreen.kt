@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 import kotlin.math.abs
 
 val allCategories = listOf(
@@ -57,12 +58,20 @@ private val placeholderColors = listOf(
 fun FeedScreen(
     uiState: FeedUiState,
     onRetry: () -> Unit,
+    onSilentRefresh: () -> Unit,
     onItemClick: (Item) -> Unit,
     onAddClick: () -> Unit,
     onProfileClick: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("Все") }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(10000)
+            onSilentRefresh()
+        }
+    }
 
     val itemsToShow = if (uiState is FeedUiState.Success) {
         uiState.items.filter { item ->

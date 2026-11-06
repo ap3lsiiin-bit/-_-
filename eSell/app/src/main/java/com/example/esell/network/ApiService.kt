@@ -11,6 +11,7 @@ import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.Response
 
 interface ApiService {
     @GET("items")
@@ -40,7 +41,7 @@ interface ApiService {
     suspend fun createItem(@Body request: CreateItemRequest): ItemResponse
 
     @DELETE("items/{item_id}")
-    suspend fun deleteItem(@Path("item_id") itemId: Int)
+    suspend fun deleteItem(@Path("item_id") itemId: Int): Response<Unit>
 
     @GET("items/{item_id}/messages")
     suspend fun getMessages(
